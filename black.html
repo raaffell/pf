@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Mini Blackjack 21 raaffell</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    boxShadow: {
+                        glow: "0 0 0 1px rgba(255,255,255,0.08), 0 8px 30px rgba(0,0,0,0.35)",
+                    },
+                },
+            },
+        };
+    </script>
+    <!-- GSAP -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"
+        integrity="sha512-7eHRwcbYkK4d9g/6tD/mhkf++eoTHwpNM9woBxtPUBWm67zeAfFC+HrdoE2GanKeocly/VxeLvIqwvCdk7qScg=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+    <style>
+        :root {
+            --card-w: 90px;
+            --card-h: 130px;
+            --card-radius: 10px;
+        }
+
+        @media (min-width: 640px) {
+            :root {
+                --card-w: 110px;
+                --card-h: 160px;
+                --card-radius: 12px;
+            }
+        }
+
+        /* --- CONTAINER UTAMA --- */
+        .perspective {
+            perspective: 1200px; /* Perspective lebih dalam untuk efek 3D yang kuat */
+        }
+
+        .card {
+            width: var(--card-w);
+            height: var(--card-h);
+            user-select: none;
+            cursor: default;
+            transition: transform 0.2s ease, filter 0.3s ease;
+            position: relative;
+        }
+
+        /* Efek Hover saat mouse di kartu */
+        .card:hover {
+            transform: translateY(-5px);
+            z-index: 50;
+        }
+
+        .card-inner {
+            transform-style: preserve-3d;
+            transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Efek membalik yang "bouncy" */
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Class untuk membalik kartu */
+        .card-inner.flipped {
+            transform: rotateY(180deg);
+        }
+
+        .card-face {
+            position: absolute;
+            inset: 0;
+            border-radius: var(--card-radius);
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            overflow: hidden;
+        }
+
+        /* --- DESAIN DEPAN KARTU (PREMIUM LOOK) --- */
+        .card-front-face {
+            background-color: #ffffff;
+            /* Vignette radial gradient untuk efek kertas */
+            background-image: radial-gradient(circle at center, #ffffff 40%, #f1f5f9 100%);
+            border: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 6px;
+            transform: rotateY(0deg); /* Posisi awal */
+        }
+
+        /* Border ganda dalam untuk kesan mahal */
+        .card-front-face::after {
+            content: "";
+            position: absolute;
+            inset: 4px;
+            border: 1px solid rgba(0,0,0,0.05);
+            border-radius: 8px;
+            pointer-events: none;
+        }
+
+        /* Typography Casino Style (Times New Roman / Serif) */
+        .casino-text {
+            font-family: 'Times New Roman', Times, serif;
+            line-height: 1;
+        }
+
+        .card-corner {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            width: 1.8em; /* Lebarnya proporsional */
+        }
+
+        .rank {
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .suit-small {
+            font-size: 0.9rem;
+            line-height: 0.8;
+            margin-top: -2px;
+        }
+
+        .card-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 3rem;
+            opacity: 0.2; /* Watermark halus di tengah */
+            pointer-events: none;
+        }
+
+        /* Warna Kartu */
+        .suit-red { color: #dc2626; } /* Merah Terang */
+        .suit-black { color: #0f172a; } /* Hitam Pekat */
+
+        /* --- DESAIN BELAKANG KARTU (PATTERN PREMIUM) --- */
+        .card-back-face {
+            background-color: #1e3a8a; /* Base Royal Blue */
+            /* Pola Geometris Murni dengan CSS Gradients */
+            background-image: 
+                linear-gradient(30deg, #1e40af 12%, transparent 12.5%, transparent 87%, #1e40af 87.5%, #1e40af),
+                linear-gradient(150deg, #1e40af 12%, transparent 12.5%, transparent 87%, #1e40af 87.5%, #1e40af),
+                linear-gradient(30deg, #1e40af 12%, transparent 12.5%, transparent 87%, #1e40af 87.5%, #1e40af),
+                linear-gradient(150deg, #1e40af 12%, transparent 12.5%, transparent 87%, #1e40af 87.5%, #1e40af),
+                radial-gradient(#3b82f6 20%, transparent 20%),
+                radial-gradient(#3b82f6 20%, transparent 20%);
+            background-position: 0 0, 0 0, 10px 10px, 10px 10px, 0 0, 10px 10px;
+            background-size: 20px 20px;
+            background-repeat: repeat;
+            
+            border: 4px solid #ffffff; /* Border Putih Tebal */
+            transform: rotateY(180deg); /* Default terbalik */
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        /* Seal/Logo di tengah belakang kartu */
+        .card-back-face::before {
+            content: "JKP";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: bold;
+            font-size: 1.2rem;
+            color: rgba(255,255,255,0.2);
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: grid;
+            place-items: center;
+            background: rgba(0,0,0,0.2);
+        }
+
+        /* --- END CARD DESIGN --- */
+
+        .card.glow {
+            filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.6)) drop-shadow(0 0 12px rgba(59, 130, 246, 0.5));
+        }
+
+        @keyframes shakeX {
+            0% { transform: translateX(0) }
+            25% { transform: translateX(-6px) }
+            50% { transform: translateX(6px) }
+            75% { transform: translateX(-4px) }
+            100% { transform: translateX(0) }
+        }
+
+        .card.shake {
+            animation: shakeX .5s ease;
+        }
+
+        .status-box { min-height: 1.25rem; display: block; }
+        .status-text { display: inline-block; opacity: 0; transform: translateY(-4px); transition: opacity .18s ease, transform .18s ease; }
+        .status-text.visible { opacity: 1; transform: translateY(0); }
+
+        .deck-spot { width: calc(var(--card-w)); height: calc(var(--card-h)); pointer-events: none; z-index: 3000; }
+        
+        .deck-stack { position: relative; width: 100%; height: 100%; }
+        
+        .deck-stack .deck-card {
+            position: absolute; inset: 0; border-radius: var(--card-radius);
+            /* Gunakan style belakang kartu untuk deck */
+            background-color: #1e3a8a;
+            background-image: 
+                linear-gradient(30deg, #1e40af 12%, transparent 12.5%, transparent 87%, #1e40af 87.5%, #1e40af),
+                linear-gradient(150deg, #1e40af 12%, transparent 12.5%, transparent 87%, #1e40af 87.5%, #1e40af);
+            background-size: 20px 20px;
+            border: 2px solid white;
+            display: grid; place-items: center; color: #cbd5e1; font-weight: 700; font-size: 12px;
+            transform-origin: center; box-shadow: 0 6px 18px rgba(2, 6, 23, 0.6);
+        }
+        .deck-stack .deck-card.layer-1 { transform: translate(8px, -6px) rotate(-6deg); z-index: 1; opacity: 0.9; }
+        .deck-stack .deck-card.layer-2 { transform: translate(4px, -3px) rotate(-3deg); z-index: 2; opacity: 0.95; }
+        .deck-stack .deck-card.front { 
+            transform: translate(0px, 0px) rotate(0deg); 
+            z-index: 3; 
+            background: linear-gradient(180deg, #1e3a8a, #172554); 
+            border: 2px solid rgba(255, 255, 255, 0.2); 
+            color: #e6f0ff; font-size: 13px; letter-spacing: .4px; 
+        }
+
+        #botHand, #playerHand { min-height: 140px; }
+        #toast { min-width: 180px; z-index: 9000; }
+        .scale-95 { transform: scale(0.95); }
+        .preset-buttons-container { min-height: 32px; }
+        .mute-icon-container { width: 20px; height: 20px; position: relative; }
+        .mute-icon { position: absolute; inset: 0; opacity: 1; transition: opacity 0.2s ease; }
+        .mute-icon.hidden { opacity: 0; pointer-events: none; }
+    </style>
+</head>
+
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans">
+    <div class="max-w-5xl mx-auto p-4 sm:p-6">
+        <header class="flex items-center max-sm:flex-col justify-between gap-4">
+            <h1 class="text-xl sm:text-2xl font-bold tracking-wide">Mini Blackjack <span class="text-slate-400 text-base font-normal">| By raaffell</span></h1>
+        </header>
+
+        <!-- Controls Desktop -->
+        <section class="mt-4 flex w-full sm:grid-cols-3 gap-3">
+            <div class="sm:col-span-1 bg-slate-800/60 rounded-2xl p-4 shadow-glow w-2/5 max-sm:hidden border border-slate-700/50">
+                <div class="flex items-center justify-between">
+                    <div class="text-sm text-slate-300 font-medium">Aksi Taruhan</div>
+                    <div class="text-xs text-slate-400">Total: <span id="prizePool" class="font-bold text-base text-white">Rp 0</span></div>
+                </div>
+                <label class="block text-xs text-slate-300 mb-1 mt-2" for="bet">Jumlah Taruhan</label>
+                <div class="flex items-center gap-2">
+                    <span class="px-3 py-2 rounded-xl bg-slate-900/40 text-slate-300 font-mono">Rp</span>
+                    <input id="bet" type="text" inputmode="numeric" pattern="[0-9.]*"
+                        class="w-full rounded-xl bg-slate-900 border border-slate-700 p-2 outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                        placeholder="10.000" value="10.000" />
+                </div>
+                <div class="mt-3 flex gap-2">
+                    <button id="dealBtn" class="flex-1 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 transition px-4 py-2 font-semibold shadow-lg shadow-blue-900/20">Mulai</button>
+                    <button id="raiseBtn" class="flex-1 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 transition px-4 py-2 font-semibold disabled:opacity-40 disabled:cursor-not-allowed hidden shadow-lg shadow-indigo-900/20">Naikkan</button>
+                    <button id="resetBtn" class="rounded-xl bg-slate-700 hover:bg-slate-600 active:bg-slate-800 transition px-4 py-2 shadow-lg">Reset</button>
+                </div>
+
+                <div id="presetButtons" class="mt-2 grid grid-cols-4 gap-1 preset-buttons-container opacity-0 pointer-events-none">
+                    <button class="preset-btn rounded-lg bg-red-600/80 hover:bg-red-500 active:bg-red-700 transition px-2 py-1 text-xs font-semibold border border-red-400/30" data-value="-10000">-10k</button>
+                    <button class="preset-btn rounded-lg bg-red-600/80 hover:bg-red-500 active:bg-red-700 transition px-2 py-1 text-xs font-semibold border border-red-400/30" data-value="-5000">-5k</button>
+                    <button class="preset-btn rounded-lg bg-emerald-600/80 hover:bg-emerald-500 active:bg-emerald-700 transition px-2 py-1 text-xs font-semibold border border-emerald-400/30" data-value="5000">+5k</button>
+                    <button class="preset-btn rounded-lg bg-emerald-600/80 hover:bg-emerald-500 active:bg-emerald-700 transition px-2 py-1 text-xs font-semibold border border-emerald-400/30" data-value="10000">+10k</button>
+                </div>
+                <p class="text-[10px] text-slate-500 mt-2 leading-tight">Payout: Menang (x2), Kalah (0), Seri (1x)</p>
+            </div>
+
+            <div class="sm:col-span-2 bg-slate-800/60 rounded-2xl p-4 shadow-glow w-3/5 flex flex-col justify-between max-sm:w-full border border-slate-700/50">
+                <div class="flex items-center flex-row-reverse gap-4 max-sm:w-full max-sm:justify-between">
+                    <div class="text-right">
+                        <div class="text-sm text-slate-400 uppercase tracking-wider font-bold">Saldo</div>
+                        <div id="balance" class="text-2xl font-bold font-mono tracking-tight text-emerald-400">Rp 100.000</div>
+                    </div>
+                </div>
+
+                <div class="max-sm:hidden">
+                    <div class="flex items-center justify-between">
+                        <div class="text-sm text-slate-300 font-medium">Aksi Permainan</div>
+                    </div>
+                    <div class="mt-2 flex gap-3">
+                        <button id="hitBtn" class="rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 transition px-4 py-2 font-semibold disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-emerald-900/20 text-white" disabled>Ambil Kartu</button>
+                        <button id="standBtn" class="rounded-xl bg-amber-600 hover:bg-amber-500 active:bg-amber-700 transition px-4 py-2 font-semibold disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-amber-900/20 text-white" disabled>Sudahi Giliran</button>
+                        <div class="flex items-center gap-2">
+                            <button id="muteBtnMobile" class="p-2 rounded-lg bg-slate-700/50 hover:bg-slate-600/50 transition-colors border border-slate-600">
+                                <div class="mute-icon-container">
+                                    <svg id="muteIconMobile" class="mute-icon w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.617.794L4.383 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.383l4.017-2.794a1 1 0 011.617.794zM12.293 7.293a1 1 0 011.414 0L15 8.586l1.293-1.293a1 1 0 111.414 1.414L16.414 10l1.293 1.293a1 1 0 01-1.414 1.414L15 11.414l-1.293 1.293a1 1 0 01-1.414-1.414L13.586 10l-1.293-1.293a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+                                    <svg id="unmuteIconMobile" class="mute-icon w-5 h-5 opacity-0 pointer-events-none" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.617.794L4.383 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.383l4.017-2.794a1 1 0 011.617.794z" clip-rule="evenodd"></path><path d="M14.5 6.5a1 1 0 011.5 1.32 4 4 0 010 4.36 1 1 0 11-1.5 1.32 6 6 0 000-7.04z"></path><path d="M16.5 4.5a1 1 0 011.5 1.32 8 8 0 010 8.36 1 1 0 11-1.5 1.32 10 10 0 000-11z"></path></svg>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="status-box mt-3 text-slate-300 font-medium"><span id="status" class="status-text"></span></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Table Area -->
+        <section class="mt-6 bg-gradient-to-br from-green-900/80 to-green-950/90 rounded-3xl p-4 sm:p-6 shadow-glow relative overflow-hidden border border-green-800/50">
+            <!-- Green Felt Texture -->
+            <div class="absolute inset-0 opacity-10" style="background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIi8+CjxyZWN0IHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiMwMDAiLz4KPC9zdmc+'); pointer-events: none;"></div>
+
+            <div id="deckSpot" class="absolute right-4 top-4 perspective deck-spot" aria-hidden="true">
+                <div class="deck-stack">
+                    <div class="deck-card layer-1"></div>
+                    <div class="deck-card layer-2"></div>
+                    <div class="deck-card front">DECK</div>
+                </div>
+            </div>
+
+            <div class="mb-8 max-sm:mt-32 sm:mr-32">
+                <div class="flex items-baseline justify-between border-b border-green-800/50 pb-2">
+                    <h2 class="text-lg font-bold tracking-wide">DEALER (Bot)</h2>
+                    <div class="text-green-200/70 font-mono text-lg">Total: <span id="botTotal">0</span></div>
+                </div>
+                <div id="botHand" class="min-h-[140px] sm:min-h-[170px] flex flex-wrap items-center gap-3 mt-4"></div>
+            </div>
+
+            <hr class="border-green-800/40 my-6" />
+
+            <div>
+                <div class="flex items-baseline justify-between border-b border-green-800/50 pb-2">
+                    <h2 class="text-lg font-bold tracking-wide">PLAYER (Kamu)</h2>
+                    <div class="text-green-200/70 font-mono text-lg">Total: <span id="playerTotal">0</span></div>
+                </div>
+                <div id="playerHand" class="min-h-[140px] sm:min-h-[170px] flex flex-wrap items-center gap-3 mt-4"></div>
+            </div>
+        </section>
+
+        <!-- Controls Mobile -->
+        <section class="mt-4 grid sm:grid-cols-3 gap-3">
+            <div class="sm:hidden sm:col-span-2 bg-slate-800/60 rounded-2xl p-4 shadow-glow border border-slate-700/50">
+                <div class="flex items-center justify-between">
+                    <div class="text-sm text-slate-300 font-medium">Aksi Permainan</div>
+                </div>
+                <div class="mt-2 flex gap-3 flex-row-reverse">
+                    <button id="standBtnMobile" class="flex-1 rounded-xl bg-amber-600 hover:bg-amber-500 active:bg-amber-700 transition px-4 py-2 font-semibold disabled:opacity-40 disabled:cursor-not-allowed text-white" disabled>Sudahi</button>
+                    <button id="hitBtnMobile" class="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 transition px-4 py-2 font-semibold disabled:opacity-40 disabled:cursor-not-allowed text-white" disabled>Hit</button>
+                    <div class="flex items-center gap-2">
+                        <button id="muteBtn" class="p-2 rounded-lg bg-slate-700/50 hover:bg-slate-600/50 transition-colors border border-slate-600">
+                            <div class="mute-icon-container">
+                                <svg id="muteIcon" class="mute-icon w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.617.794L4.383 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.383l4.017-2.794a1 1 0 011.617.794zM12.293 7.293a1 1 0 011.414 0L15 8.586l1.293-1.293a1 1 0 111.414 1.414L16.414 10l1.293 1.293a1 1 0 01-1.414 1.414L15 11.414l-1.293 1.293a1 1 0 01-1.414-1.414L13.586 10l-1.293-1.293a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+                                <svg id="unmuteIcon" class="mute-icon w-5 h-5 opacity-0 pointer-events-none" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.617.794L4.383 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.383l4.017-2.794a1 1 0 011.617.794z" clip-rule="evenodd"></path><path d="M14.5 6.5a1 1 0 011.5 1.32 4 4 0 010 4.36 1 1 0 11-1.5 1.32 6 6 0 000-7.04z"></path><path d="M16.5 4.5a1 1 0 011.5 1.32 8 8 0 010 8.36 1 1 0 11-1.5 1.32 10 10 0 000-11z"></path></svg>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+                <div class="status-box mt-3 text-slate-300 font-medium"><span id="statusMobile" class="status-text"></span></div>
+            </div>
+        </section>
+
+        <!-- Aksi Taruhan Mobile -->
+        <section class="mt-4 sm:hidden">
+            <div class="bg-slate-800/60 rounded-2xl p-4 shadow-glow border border-slate-700/50">
+                <div class="flex items-center justify-between">
+                    <div class="text-sm text-slate-300 font-medium">Aksi Taruhan</div>
+                    <div class="text-xs text-slate-400">Total: <span id="prizePoolMobile" class="font-bold text-base text-white">Rp 0</span></div>
+                </div>
+                <label class="block text-xs text-slate-300 mb-1 mt-2" for="betMobile">Jumlah Taruhan</label>
+                <div class="flex items-center gap-2">
+                    <span class="px-3 py-2 rounded-xl bg-slate-900/40 text-slate-300 font-mono">Rp</span>
+                    <input id="betMobile" type="text" inputmode="numeric" pattern="[0-9.]*"
+                        class="w-full rounded-xl bg-slate-900 border border-slate-700 p-2 outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                        placeholder="10.000" value="10.000" />
+                </div>
+                <div class="mt-3 flex gap-2">
+                    <button id="dealBtnMobile" class="flex-1 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 transition px-4 py-2 font-semibold shadow-lg shadow-blue-900/20">Mulai</button>
+                    <button id="raiseBtnMobile" class="flex-1 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 transition px-4 py-2 font-semibold disabled:opacity-40 disabled:cursor-not-allowed hidden shadow-lg shadow-indigo-900/20">Naikkan</button>
+                    <button id="resetBtnMobile" class="rounded-xl bg-slate-700 hover:bg-slate-600 active:bg-slate-800 transition px-4 py-2 shadow-lg">Reset</button>
+                </div>
+
+                <div id="presetButtonsMobile" class="mt-2 grid grid-cols-4 gap-1 preset-buttons-container opacity-0 pointer-events-none">
+                    <button class="preset-btn rounded-lg bg-red-600/80 hover:bg-red-500 active:bg-red-700 transition px-2 py-1 text-xs font-semibold border border-red-400/30" data-value="-10000">-10k</button>
+                    <button class="preset-btn rounded-lg bg-red-600/80 hover:bg-red-500 active:bg-red-700 transition px-2 py-1 text-xs font-semibold border border-red-400/30" data-value="-5000">-5k</button>
+                    <button class="preset-btn rounded-lg bg-emerald-600/80 hover:bg-emerald-500 active:bg-emerald-700 transition px-2 py-1 text-xs font-semibold border border-emerald-400/30" data-value="5000">+5k</button>
+                    <button class="preset-btn rounded-lg bg-emerald-600/80 hover:bg-emerald-500 active:bg-emerald-700 transition px-2 py-1 text-xs font-semibold border border-emerald-400/30" data-value="10000">+10k</button>
+                </div>
+            </div>
+        </section>
+
+        <footer class="mt-8 text-center text-xs text-slate-500">&copy; <span id="year"></span> JKP Project – Premium Blackjack</footer>
+    </div>
+
+    <!-- Template kartu -->
+    <template id="cardTemplate">
+        <div class="card perspective select-none">
+            <div class="card-inner relative w-full h-full transition-transform duration-500 ease-out">
+                <!-- Card Back (Face Down) -->
+                <div class="card-face card-back-face"></div>
+                <!-- Card Front (Face Up) -->
+                <div class="card-face card-front-face">
+                    <div class="card-corner top">
+                        <span class="rank casino-text"></span>
+                        <span class="suit-small casino-text"></span>
+                    </div>
+                    <div class="card-center casino-text"></div>
+                    <div class="card-corner bottom">
+                        <span class="rank casino-text"></span>
+                        <span class="suit-small casino-text"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Toast notifikasi -->
+    <div id="toast" class="hidden fixed left-1/2 transform -translate-x-1/2 top-4 px-4 py-2 rounded-full text-white shadow-lg border border-white/10 backdrop-blur-md bg-slate-800/90">
+        <span id="toastMsg" class="text-sm font-bold"></span>
+    </div>
+
+    <script>
+        // ====== AUDIO MANAGER (MUTED FOR PORTABILITY) ======
+        class AudioManager {
+            constructor() { this.isMuted = true; this.volume = 1.0; }
+            play(name) { console.log(`Audio: ${name}`); }
+            playMusic() {}
+            stopMusic() {}
+            toggleMute() { this.isMuted = !this.isMuted; return this.isMuted; }
+        }
+        const audioManager = new AudioManager();
+
+        // ====== GAME LOGIC ======
+        const SUITS = ['H', 'W', 'K', 'S'];
+        const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+
+        const getSuitInfo = (s) => {
+            switch(s) {
+                case 'H': return { symbol: '♥', color: 'suit-red' };
+                case 'W': return { symbol: '♦', color: 'suit-red' };
+                case 'K': return { symbol: '♣', color: 'suit-black' };
+                case 'S': return { symbol: '♠', color: 'suit-black' };
+                default: return { symbol: '?', color: 'suit-black' };
+            }
+        };
+
+        let deck = [];
+        let playerHand = [];
+        let botHand = [];
+        let balance = 100000;
+        let totalBet = 0;
+        let roundActive = false;
+        let botHiddenCardEl = null;
+        let isProcessingAction = false;
+
+        // Rigging Config
+        const RIG_CONFIG = { limit_fair: 750000, limit_rigged: 1000000, riggedChance: 0.2 };
+        let isRiggingActive = false;
+
+        function applyRigging(playerBalance, normalResult) {
+            if (playerBalance < RIG_CONFIG.limit_fair) return normalResult;
+            if (playerBalance >= RIG_CONFIG.limit_fair && playerBalance < RIG_CONFIG.limit_rigged) {
+                if (normalResult === 'win' && Math.random() < RIG_CONFIG.riggedChance) return 'lose';
+                return normalResult;
+            }
+            if (playerBalance >= RIG_CONFIG.limit_rigged) {
+                if (normalResult === 'win') return 'lose';
+            }
+            return normalResult;
+        }
+
+        function needsRigging(playerBalance, potentialWin) {
+            return (playerBalance + potentialWin) >= RIG_CONFIG.limit_rigged;
+        }
+
+        function getRiggedCard(targetTotal, currentTotal) {
+            const neededValue = targetTotal - currentTotal;
+            let perfectCard = null;
+            let perfectCardIndex = -1;
+            for (let i = 0; i < deck.length; i++) {
+                if (valueOfCard(deck[i].rank) === neededValue) {
+                    perfectCard = deck[i]; perfectCardIndex = i; break;
+                }
+            }
+            if (!perfectCard) {
+                for (let i = 0; i < deck.length; i++) {
+                    if (currentTotal + valueOfCard(deck[i].rank) <= 21) {
+                        perfectCard = deck[i]; perfectCardIndex = i; break;
+                    }
+                }
+            }
+            if (!perfectCard) { perfectCard = deck[0]; perfectCardIndex = 0; }
+            if (perfectCardIndex > -1) deck.splice(perfectCardIndex, 1);
+            return perfectCard;
+        }
+
+        const els = {
+            balance: document.getElementById('balance'),
+            bet: document.getElementById('bet'),
+            dealBtn: document.getElementById('dealBtn'),
+            resetBtn: document.getElementById('resetBtn'),
+            hitBtn: document.getElementById('hitBtn'),
+            standBtn: document.getElementById('standBtn'),
+            status: document.getElementById('status'),
+            deckSpot: document.getElementById('deckSpot'),
+            botHand: document.getElementById('botHand'),
+            playerHand: document.getElementById('playerHand'),
+            botTotal: document.getElementById('botTotal'),
+            playerTotal: document.getElementById('playerTotal'),
+            year: document.getElementById('year'),
+            cardTemplate: document.getElementById('cardTemplate'),
+            toast: document.getElementById('toast'),
+            toastMsg: document.getElementById('toastMsg'),
+            prizePool: document.getElementById('prizePool'),
+            raiseBtn: document.getElementById('raiseBtn'),
+            hitBtnMobile: document.getElementById('hitBtnMobile'),
+            standBtnMobile: document.getElementById('standBtnMobile'),
+            statusMobile: document.getElementById('statusMobile'),
+            presetButtons: document.getElementById('presetButtons'),
+            betMobile: document.getElementById('betMobile'),
+            dealBtnMobile: document.getElementById('dealBtnMobile'),
+            raiseBtnMobile: document.getElementById('raiseBtnMobile'),
+            resetBtnMobile: document.getElementById('resetBtnMobile'),
+            presetButtonsMobile: document.getElementById('presetButtonsMobile'),
+            prizePoolMobile: document.getElementById('prizePoolMobile'),
+            muteBtn: document.getElementById('muteBtn'),
+            muteIcon: document.getElementById('muteIcon'),
+            unmuteIcon: document.getElementById('unmuteIcon'),
+            muteBtnMobile: document.getElementById('muteBtnMobile'),
+            muteIconMobile: document.getElementById('muteIconMobile'),
+            unmuteIconMobile: document.getElementById('unmuteIconMobile')
+        };
+        els.year.textContent = new Date().getFullYear();
+
+        function statusNodes() { return Array.from(document.querySelectorAll('#status, #statusMobile')); }
+        function setStatus(text, autoHide = false) {
+            statusNodes().forEach(n => { n.textContent = text; requestAnimationFrame(() => n.classList.add('visible')); });
+            if (autoHide) { clearTimeout(setStatus._t); setStatus._t = setTimeout(() => statusNodes().forEach(n => n.classList.remove('visible')), 1800); }
+        }
+        function controlCollections() {
+            return {
+                hit: [els.hitBtn, els.hitBtnMobile].filter(b => b),
+                stand: [els.standBtn, els.standBtnMobile].filter(b => b),
+                deal: [els.dealBtn, els.dealBtnMobile].filter(b => b),
+                reset: [els.resetBtn, els.resetBtnMobile].filter(b => b),
+                raise: [els.raiseBtn, els.raiseBtnMobile].filter(b => b),
+            };
+        }
+        const fmtRupiah = n => `Rp ${n.toLocaleString('id-ID')}`;
+        function updateBalanceUI() { els.balance.textContent = fmtRupiah(balance); }
+        function updatePrizePoolUI() { els.prizePool.textContent = fmtRupiah(totalBet); if (els.prizePoolMobile) els.prizePoolMobile.textContent = fmtRupiah(totalBet); }
+        function numberWithDots(n) { return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+        function getBetNumeric(inputEl) {
+            const raw = (inputEl.dataset.raw || inputEl.value || '').toString().replace(/\D/g, '');
+            const num = raw === '' ? 0 : parseInt(raw, 10);
+            return Number.isNaN(num) ? 0 : num;
+        }
+        function renderBetFromRaw(rawDigits, inputEl) { inputEl.dataset.raw = rawDigits; inputEl.value = rawDigits === '' ? '' : numberWithDots(rawDigits); }
+        function updateRaiseButtonState() {
+            const raiseAmount = getBetNumeric(els.bet);
+            const isEnabled = roundActive && !isProcessingAction && raiseAmount > 0 && balance >= raiseAmount;
+            els.raiseBtn.disabled = !isEnabled;
+            if (els.raiseBtnMobile) els.raiseBtnMobile.disabled = !isEnabled;
+        }
+        els.bet.addEventListener('input', (e) => {
+            const digits = (e.target.value || '').replace(/\D/g, '');
+            renderBetFromRaw(digits, els.bet);
+            if (els.betMobile) renderBetFromRaw(digits, els.betMobile);
+            updateRaiseButtonState();
+        });
+        els.bet.addEventListener('blur', () => {
+            let v = getBetNumeric(els.bet);
+            if (v === 0) v = 1000; if (v > balance) v = balance;
+            renderBetFromRaw(String(v), els.bet);
+            if (els.betMobile) renderBetFromRaw(String(v), els.betMobile);
+            updateRaiseButtonState();
+        });
+        if (els.betMobile) {
+            els.betMobile.addEventListener('input', (e) => {
+                const digits = (e.target.value || '').replace(/\D/g, '');
+                renderBetFromRaw(digits, els.betMobile);
+                renderBetFromRaw(digits, els.bet);
+                updateRaiseButtonState();
+            });
+            els.betMobile.addEventListener('blur', () => {
+                let v = getBetNumeric(els.betMobile);
+                if (v === 0) v = 1000; if (v > balance) v = balance;
+                renderBetFromRaw(String(v), els.betMobile);
+                renderBetFromRaw(String(v), els.bet);
+                updateRaiseButtonState();
+            });
+        }
+        function showToast(message, type = 'info', timeout = 2500) {
+            const toast = document.getElementById('toast');
+            const msg = document.getElementById('toastMsg');
+            if (!toast || !msg) return;
+            msg.textContent = message;
+            toast.classList.remove('bg-green-600', 'bg-red-600', 'bg-slate-800', 'hidden');
+            toast.classList.add('bg-slate-800'); // default style
+            if (type === 'win') toast.style.borderColor = '#4ade80'; // green border
+            else if (type === 'lose') toast.style.borderColor = '#f87171'; // red border
+            else toast.style.borderColor = 'rgba(255,255,255,0.1)';
+            
+            gsap.fromTo(toast, { y: -60, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.35, ease: 'power2.out' });
+            if (toast._timeout) clearTimeout(toast._timeout);
+            toast._timeout = setTimeout(() => hideToast(), timeout);
+        }
+        function hideToast() {
+            const toast = document.getElementById('toast');
+            if (!toast) return;
+            gsap.to(toast, { y: -60, autoAlpha: 0, duration: 0.3, ease: 'power2.in', onComplete: () => toast.classList.add('hidden') });
+        }
+        document.getElementById('toast')?.addEventListener('click', hideToast);
+
+        function buildDeck() { deck = []; for (const s of SUITS) for (const r of RANKS) deck.push({ suit: s, rank: r }); }
+        function shuffle(arr) { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; }
+        function valueOfCard(rank) { if (rank === 'A') return 11; if (['K', 'Q', 'J'].includes(rank)) return 10; return parseInt(rank, 10); }
+        function handTotal(hand) {
+            let total = 0, aces = 0;
+            for (const c of hand) { total += valueOfCard(c.rank); if (c.rank === 'A') aces++; }
+            while (total > 21 && aces > 0) { total -= 10; aces--; }
+            return total;
+        }
+        function resetTable() {
+            els.botHand.innerHTML = '';
+            els.playerHand.innerHTML = '';
+            els.botTotal.textContent = '0';
+            els.playerTotal.textContent = '0';
+            setStatus('');
+            botHiddenCardEl = null;
+            playerHand = [];
+            botHand = [];
+        }
+        function setControls({ inRound }) {
+            const cols = controlCollections();
+            cols.hit.forEach(b => b.disabled = !inRound);
+            cols.stand.forEach(b => b.disabled = !inRound);
+            cols.deal.forEach(b => b.classList.toggle('hidden', inRound));
+            cols.raise.forEach(b => b.classList.toggle('hidden', !inRound));
+            cols.reset.forEach(b => b.disabled = false);
+            [els.presetButtons, els.presetButtonsMobile].forEach(container => {
+                if (container) { container.style.opacity = inRound ? '1' : '0'; container.style.pointerEvents = inRound ? 'auto' : 'none'; }
+            });
+            updateRaiseButtonState();
+        }
+
+        function createCardElement(card) {
+            const tpl = els.cardTemplate.content.firstElementChild.cloneNode(true);
+            const frontFace = tpl.querySelector('.card-front-face');
+            const suitInfo = getSuitInfo(card.suit);
+            frontFace.classList.add(suitInfo.color);
+            tpl.querySelector('.rank').textContent = card.rank;
+            tpl.querySelectorAll('.suit-small').forEach(el => el.textContent = suitInfo.symbol);
+            tpl.querySelector('.card-center').textContent = suitInfo.symbol;
+            return tpl;
+        }
+
+        function centerOf(el) {
+            const r = el.getBoundingClientRect();
+            return { x: r.left + r.width / 2 + window.scrollX, y: r.top + r.height / 2 + window.scrollY, w: r.width, h: r.height };
+        }
+
+        async function dealCardAnimated(targetContainer, card, { faceDown = false } = {}) {
+            const cardEl = createCardElement(card);
+            document.body.appendChild(cardEl);
+            cardEl.style.position = 'absolute';
+            cardEl.style.zIndex = 1000;
+            cardEl.style.pointerEvents = 'none';
+
+            const deckC = centerOf(els.deckSpot);
+            const cardRect = cardEl.getBoundingClientRect();
+            const startLeft = deckC.x - cardRect.width / 2;
+            const startTop = deckC.y - cardRect.height / 2;
+            cardEl.style.left = startLeft + 'px';
+            cardEl.style.top = startTop + 'px';
+
+            const targetDummy = document.createElement('div');
+            targetDummy.className = 'card';
+            targetContainer.appendChild(targetDummy);
+            const targetC = centerOf(targetDummy);
+            const endLeft = targetC.x - cardRect.width / 2;
+            const endTop = targetC.y - cardRect.height / 2;
+
+            audioManager.play('cardToHand');
+
+            await gsap.to(cardEl, {
+                duration: .45,
+                left: endLeft,
+                top: endTop,
+                rotation: (Math.random() * 10 - 5),
+                ease: 'power2.out'
+            });
+
+            targetContainer.replaceChild(cardEl, targetDummy);
+            cardEl.style.position = 'relative';
+            cardEl.style.left = '0px';
+            cardEl.style.top = '0px';
+            cardEl.style.transform = '';
+            cardEl.style.zIndex = 'auto';
+            cardEl.style.pointerEvents = 'auto';
+
+            const inner = cardEl.querySelector('.card-inner');
+            // Set default state to show Back
+            inner.classList.add('flipped'); 
+
+            if (!faceDown) {
+                audioManager.play('cardFlip');
+                await new Promise(r => setTimeout(r, 50));
+                inner.classList.remove('flipped'); // Reveal Front
+                await new Promise(r => setTimeout(r, 300));
+                cardEl.classList.add('glow');
+                setTimeout(() => cardEl.classList.remove('glow'), 600);
+            }
+            return cardEl;
+        }
+
+        async function collectCardsBack() {
+            const allCards = Array.from(document.querySelectorAll('#playerHand .card, #botHand .card'));
+            if (allCards.length === 0) return;
+            const botCards = Array.from(document.querySelectorAll('#botHand .card'));
+            const playerCards = Array.from(document.querySelectorAll('#playerHand .card'));
+            const orderedCards = [];
+            for (let i = botCards.length - 1; i >= 0; i--) if (botCards[i]) orderedCards.push(botCards[i]);
+            for (let i = playerCards.length - 1; i >= 0; i--) if (playerCards[i]) orderedCards.push(playerCards[i]);
+
+            if (orderedCards.length === 0) return;
+
+            for (let i = 0; i < orderedCards.length; i++) {
+                const card = orderedCards[i];
+                const inner = card.querySelector('.card-inner');
+                inner.classList.add('flipped'); // Flip to back
+                audioManager.play('cardFlip');
+                await new Promise(r => setTimeout(r, 100));
+            }
+            await new Promise(r => setTimeout(r, 200));
+
+            orderedCards.forEach((c, i) => {
+                const r = c.getBoundingClientRect();
+                document.body.appendChild(c);
+                c.style.position = 'absolute';
+                c.style.left = (r.left + window.scrollX) + 'px';
+                c.style.top = (r.top + window.scrollY) + 'px';
+                c.style.zIndex = 2000 + i;
+            });
+
+            const cardW = orderedCards[0].getBoundingClientRect().width;
+            const cardH = orderedCards[0].getBoundingClientRect().height;
+            const deckC = centerOf(els.deckSpot);
+
+            for (let i = 0; i < orderedCards.length; i++) {
+                const card = orderedCards[i];
+                audioManager.play('slede');
+                gsap.to(card, {
+                    duration: 0.3,
+                    left: deckC.x - cardW / 2,
+                    top: deckC.y - cardH / 2,
+                    rotation: 20,
+                    scale: 0.6,
+                    ease: 'power2.in'
+                });
+                await new Promise(r => setTimeout(r, 80));
+            }
+
+            await new Promise(r => setTimeout(r, 200));
+            orderedCards.forEach(c => { if (c && c.parentNode) c.remove(); });
+        }
+
+        function drawFromDeck() { if (deck.length === 0) { buildDeck(); shuffle(deck); } return deck.pop(); }
+
+        async function startRound() {
+            if (isProcessingAction) return;
+            isProcessingAction = true;
+
+            let initialBet = Math.max(1000, getBetNumeric(els.bet));
+            if (initialBet > balance) { initialBet = balance; renderBetFromRaw(String(initialBet), els.bet); setStatus('Taruhan otomatis disesuaikan ke saldo Anda.', true); }
+            if (initialBet < 1000) { showToast("Taruhan minimal Rp 1.000.", "info", 2000); isProcessingAction = false; return; }
+
+            balance -= initialBet; totalBet = initialBet;
+            updateBalanceUI(); updatePrizePoolUI();
+            renderBetFromRaw('0', els.bet);
+            if (els.betMobile) renderBetFromRaw('0', els.betMobile);
+
+            await collectCardsBack();
+            resetTable();
+            totalBet = initialBet; updatePrizePoolUI();
+
+            roundActive = true; isProcessingAction = false;
+            setControls({ inRound: true });
+            buildDeck(); shuffle(deck);
+
+            const p1 = drawFromDeck(); playerHand.push(p1);
+            await dealCardAnimated(els.playerHand, p1, { faceDown: false });
+            els.playerTotal.textContent = handTotal(playerHand);
+
+            const b1 = drawFromDeck(); botHand.push(b1);
+            await dealCardAnimated(els.botHand, b1, { faceDown: false });
+            els.botTotal.textContent = handTotal(botHand);
+
+            const p2 = drawFromDeck(); playerHand.push(p2);
+            await dealCardAnimated(els.playerHand, p2, { faceDown: false });
+            els.playerTotal.textContent = handTotal(playerHand);
+
+            const b2 = drawFromDeck(); botHand.push(b2);
+            botHiddenCardEl = await dealCardAnimated(els.botHand, b2, { faceDown: true });
+
+            if (handTotal(playerHand) === 21) { isProcessingAction = true; setStatus("Blackjack! Kamu menang!"); await new Promise(r => setTimeout(r, 1000)); checkWinner(); return; }
+            isProcessingAction = false; setControls({ inRound: true });
+        }
+
+        async function playerHit() {
+            if (isProcessingAction || !roundActive) return;
+            isProcessingAction = true;
+            const card = drawFromDeck(); playerHand.push(card);
+            await dealCardAnimated(els.playerHand, card, { faceDown: false });
+            els.playerTotal.textContent = handTotal(playerHand);
+            const total = handTotal(playerHand);
+            if (total > 21) { setStatus("Bust! Kamu kalah."); await new Promise(r => setTimeout(r, 1000)); endRound('lose'); }
+            else if (total === 21) { setStatus("21! Kamu menang!"); await new Promise(r => setTimeout(r, 1000)); checkWinner(); }
+            else { isProcessingAction = false; setControls({ inRound: true }); }
+        }
+
+        async function playerStand() {
+            if (isProcessingAction || !roundActive) return;
+            isProcessingAction = true;
+
+            const inner = botHiddenCardEl.querySelector('.card-inner');
+            audioManager.play('cardFlip');
+            inner.classList.remove('flipped');
+            await new Promise(r => setTimeout(r, 300));
+            els.botTotal.textContent = handTotal(botHand);
+
+            setStatus("Giliran bandar...");
+            await new Promise(r => setTimeout(r, 1000));
+
+            const playerTotal = handTotal(playerHand);
+            const potentialWin = totalBet * 2;
+            isRiggingActive = needsRigging(balance, potentialWin);
+
+            if (isRiggingActive) {
+                const botCurrentTotal = handTotal(botHand);
+                let targetTotal;
+                if (playerTotal <= 21) {
+                    if (playerTotal === 20) targetTotal = Math.random() < 0.7 ? 21 : 20;
+                    else if (playerTotal === 21) targetTotal = 21;
+                    else targetTotal = Math.max(playerTotal + 1, 17);
+                } else { targetTotal = 17; }
+
+                while (handTotal(botHand) < targetTotal && handTotal(botHand) < 21) {
+                    let card;
+                    if (handTotal(botHand) < targetTotal) { card = getRiggedCard(targetTotal, handTotal(botHand)); }
+                    else { card = drawFromDeck(); }
+                    botHand.push(card);
+                    await dealCardAnimated(els.botHand, card, { faceDown: false });
+                    els.botTotal.textContent = handTotal(botHand);
+                    await new Promise(r => setTimeout(r, 700));
+                }
+            } else {
+                while (handTotal(botHand) < 17) {
+                    const card = drawFromDeck(); botHand.push(card);
+                    await dealCardAnimated(els.botHand, card, { faceDown: false });
+                    els.botTotal.textContent = handTotal(botHand);
+                    await new Promise(r => setTimeout(r, 700));
+                }
+            }
+            checkWinner();
+        }
+
+        async function checkWinner() {
+            const playerTotal = handTotal(playerHand);
+            const botTotal = handTotal(botHand);
+            let result;
+            if (playerTotal > 21) result = 'lose';
+            else if (botTotal > 21) result = 'win';
+            else if (playerTotal > botTotal) result = 'win';
+            else if (playerTotal < botTotal) result = 'lose';
+            else result = 'draw';
+            result = applyRigging(balance, result);
+            if (result === 'lose') setStatus("Kamu kalah.");
+            else if (result === 'win') setStatus("Kamu menang!");
+            else setStatus("Seri.");
+            await new Promise(r => setTimeout(r, 1500));
+            isRiggingActive = false;
+            endRound(result);
+        }
+
+        function endRound(result) {
+            roundActive = false;
+            if (result === 'win') { balance += totalBet * 2; showToast(`Menang! + ${fmtRupiah(totalBet)}`, 'win'); audioManager.play('win'); }
+            else if (result === 'lose') { showToast(`Kalah! - ${fmtRupiah(totalBet)}`, 'lose'); audioManager.play('lose'); }
+            else { balance += totalBet; showToast("Seri.", 'info'); }
+            totalBet = 0; updateBalanceUI(); updatePrizePoolUI(); isProcessingAction = false;
+            setControls({ inRound: false });
+            renderBetFromRaw('10000', els.bet);
+            if (els.betMobile) renderBetFromRaw('10000', els.betMobile);
+            updateRaiseButtonState();
+        }
+
+        function raiseBet() {
+            if (isProcessingAction || !roundActive) return;
+            isProcessingAction = true;
+            const raiseAmount = getBetNumeric(els.bet);
+            if (raiseAmount > 0 && balance >= raiseAmount) {
+                balance -= raiseAmount; totalBet += raiseAmount;
+                updateBalanceUI(); updatePrizePoolUI();
+                renderBetFromRaw('0', els.bet);
+                if (els.betMobile) renderBetFromRaw('0', els.betMobile);
+                showToast(`Taruhan dinaikkan sebesar ${fmtRupiah(raiseAmount)}`, 'info');
+            } else { showToast("Jumlah taruhan tidak valid atau saldo tidak mencukupi.", "info"); }
+            isProcessingAction = false;
+            updateRaiseButtonState();
+        }
+
+        function resetGame() {
+            if (isProcessingAction) return;
+            balance = 100000; updateBalanceUI();
+            renderBetFromRaw('10000', els.bet);
+            resetTable(); totalBet = 0; updatePrizePoolUI(); roundActive = false; isRiggingActive = false;
+            setControls({ inRound: false });
+            showToast("Game di-reset!", "info");
+        }
+
+        els.muteBtn.addEventListener('click', () => {
+            const isMuted = audioManager.toggleMute();
+            els.muteIcon.style.opacity = isMuted ? '0' : '1';
+            els.muteIcon.style.pointerEvents = isMuted ? 'none' : 'auto';
+            els.unmuteIcon.style.opacity = isMuted ? '1' : '0';
+            els.unmuteIcon.style.pointerEvents = isMuted ? 'auto' : 'none';
+            if (els.muteIconMobile) { els.muteIconMobile.style.opacity = isMuted ? '0' : '1'; els.muteIconMobile.style.pointerEvents = isMuted ? 'none' : 'auto'; }
+            if (els.unmuteIconMobile) { els.unmuteIconMobile.style.opacity = isMuted ? '1' : '0'; els.unmuteIconMobile.style.pointerEvents = isMuted ? 'auto' : 'none'; }
+            audioManager.play('click');
+        });
+
+        if (els.muteBtnMobile) {
+            els.muteBtnMobile.addEventListener('click', () => {
+                const isMuted = audioManager.toggleMute();
+                els.muteIconMobile.style.opacity = isMuted ? '0' : '1';
+                els.muteIconMobile.style.pointerEvents = isMuted ? 'none' : 'auto';
+                els.unmuteIconMobile.style.opacity = isMuted ? '1' : '0';
+                els.unmuteIconMobile.style.pointerEvents = isMuted ? 'auto' : 'none';
+                els.muteIcon.style.opacity = isMuted ? '0' : '1';
+                els.muteIcon.style.pointerEvents = isMuted ? 'none' : 'auto';
+                els.unmuteIcon.style.opacity = isMuted ? '1' : '0';
+                els.unmuteIcon.style.pointerEvents = isMuted ? 'auto' : 'none';
+                audioManager.play('click');
+            });
+        }
+
+        window.addEventListener('load', () => {
+            renderBetFromRaw('10000', els.bet);
+            if (els.betMobile) renderBetFromRaw('10000', els.betMobile);
+            resetTable(); updateBalanceUI(); setControls({ inRound: false });
+        });
+
+        els.dealBtn.addEventListener('click', () => { audioManager.play('click'); startRound(); });
+        if (els.dealBtnMobile) els.dealBtnMobile.addEventListener('click', () => { audioManager.play('click'); startRound(); });
+        els.resetBtn.addEventListener('click', () => { audioManager.play('click'); resetGame(); });
+        if (els.resetBtnMobile) els.resetBtnMobile.addEventListener('click', () => { audioManager.play('click'); resetGame(); });
+        Array.from(document.querySelectorAll('#hitBtn, #hitBtnMobile')).forEach(b => b.addEventListener('click', () => { audioManager.play('click'); playerHit(); }));
+        Array.from(document.querySelectorAll('#standBtn, #standBtnMobile')).forEach(b => b.addEventListener('click', () => { audioManager.play('click'); playerStand(); }));
+        els.raiseBtn.addEventListener('click', () => { audioManager.play('click'); raiseBet(); });
+        if (els.raiseBtnMobile) els.raiseBtnMobile.addEventListener('click', () => { audioManager.play('click'); raiseBet(); });
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('preset-btn')) {
+                audioManager.play('click');
+                const value = parseInt(e.target.dataset.value);
+                const currentValue = getBetNumeric(els.bet);
+                const newValue = Math.max(0, currentValue + value);
+                renderBetFromRaw(String(newValue), els.bet);
+                if (els.betMobile) renderBetFromRaw(String(newValue), els.betMobile);
+                updateRaiseButtonState();
+                e.target.classList.add('scale-95');
+                setTimeout(() => e.target.classList.remove('scale-95'), 150);
+            }
+        });
+    </script>
+</body>
+</html>
